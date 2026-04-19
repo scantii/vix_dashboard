@@ -9,6 +9,23 @@ import os
 from dataclasses import dataclass, field
 from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
+
+
+def _load_dotenv() -> None:
+    """Load ``.env`` from the package directory if ``python-dotenv`` is installed."""
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    env_path = Path(__file__).resolve().parent / ".env"
+    if env_path.is_file():
+        load_dotenv(env_path)
+
+
+_load_dotenv()
+
+
 def _env(name: str, default: str | None = None) -> str | None:
     v = os.environ.get(name)
     if v is None or v == "":
