@@ -23,6 +23,7 @@ from vix_dashboard.data.models import DataHealth
 from vix_dashboard.data.yahoo_fallback import fetch_vvix_sparkline
 from vix_dashboard.signals.signal_output import build_live_signal
 from vix_dashboard.viz.signal_panel import make_health_banner, make_signal_summary_div
+from vix_dashboard.viz.spx_panel import make_spx_figure
 from vix_dashboard.viz.term_structure import make_term_structure_figure
 from vix_dashboard.viz.vvix_panel import make_vvix_figure
 
@@ -53,7 +54,7 @@ def _spot_vix(quotes: dict, sym: str) -> object | None:
 def refresh_dashboard(cfg: AppConfig, auth: TastyAuth | None) -> tuple:
     """
     Returns tuple for Dash outputs:
-    health, ts_fig, vvix_fig, signal_div, last_updated
+    health, ts_fig, vvix_fig, spx_fig, signal_div, last_updated
     """
     health = DataHealth()
     now = datetime.now(timezone.utc)
@@ -65,6 +66,7 @@ def refresh_dashboard(cfg: AppConfig, auth: TastyAuth | None) -> tuple:
             make_health_banner(health),
             make_term_structure_figure(None, None),
             make_vvix_figure(None),
+            make_spx_figure(),
             html.Div("No auth"),
             now.isoformat(),
         )
@@ -126,12 +128,18 @@ def refresh_dashboard(cfg: AppConfig, auth: TastyAuth | None) -> tuple:
     spark_x = list(spark_tail.index) if len(spark_tail) else None
     vvix_fig = make_vvix_figure(sig.vvix, sparkline_y=spark_y, sparkline_x=spark_x)
 
+    spx_spark = spx_series.tail(60)
+    spx_y = spx_spark.tolist()
+    spx_x = list(spx_spark.index) if len(spx_spark) else None
+    spx_fig = make_spx_figure(sparkline_y=spx_y, sparkline_x=spx_x)
+
     sig_div = make_signal_summary_div(sig)
 
     return (
         make_health_banner(health),
         ts_fig,
         vvix_fig,
+        spx_fig,
         sig_div,
         now.isoformat(),
     )

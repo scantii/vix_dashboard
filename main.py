@@ -42,6 +42,7 @@ def create_app(cfg=None) -> Dash:
                             dcc.Graph(id="graph-vvix"),
                         ],
                     ),
+                    dcc.Graph(id="graph-spx"),
                     html.Div(id="panel-signal"),
                 ]
             ),
@@ -53,6 +54,7 @@ def create_app(cfg=None) -> Dash:
         Output("health-banner", "children"),
         Output("graph-term-structure", "figure"),
         Output("graph-vvix", "figure"),
+        Output("graph-spx", "figure"),
         Output("panel-signal", "children"),
         Output("last-updated", "children"),
         Input("interval-live", "n_intervals"),
