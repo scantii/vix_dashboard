@@ -39,10 +39,14 @@ def make_vvix_figure(
     fig = make_subplots(
         rows=1,
         cols=2,
-        column_widths=[0.35, 0.65],
+        column_widths=[0.36, 0.64],
+        horizontal_spacing=0.06,
         specs=[[{"type": "indicator"}, {"type": "scatter"}]],
-        subplot_titles=("VVIX level", right_title),
+        subplot_titles=("", right_title),
     )
+    for ann in list(fig.layout.annotations or []):
+        if not str(ann.text or "").strip():
+            ann.visible = False
     level = float(reading.vvix) if reading else 0.0
     gauge_title = "VVIX"
     if reading and reading.pct_rank_252 is not None:
@@ -83,5 +87,12 @@ def make_vvix_figure(
         fig.update_xaxes(title_text="Date", row=1, col=2)
         fig.update_yaxes(title_text="Level", row=1, col=2)
 
-    fig.update_layout(height=360, showlegend=False)
+    # Nudge gauge subplot down and left so the meter sits more between term structure and sparkline.
+    # Extra space before the sparkline (col 2 domain start) keeps it from overlapping the gauge.
+    fig.update_xaxes(domain=[0.0, 0.30], row=1, col=1)
+    fig.update_xaxes(domain=[0.42, 1.0], row=1, col=2)
+    fig.update_yaxes(domain=[0.06, 0.72], row=1, col=1)
+    fig.update_yaxes(domain=[0.0, 1.0], row=1, col=2)
+
+    fig.update_layout(height=360, showlegend=False, margin=dict(l=0, r=8, t=36, b=28))
     return fig
