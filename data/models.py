@@ -23,7 +23,6 @@ class FuturesContract:
     active: bool
     last_trade_date: date | None = None
     exchange: str | None = None
-    is_front_month: bool = False
 
 
 @dataclass
@@ -32,7 +31,6 @@ class TermStructure:
     contracts: list[FuturesContract]
     prices_by_symbol: dict[str, Decimal]
     spot_vix: Decimal | None
-    ordered_tenors: list[str]
     contango_pct: Decimal | None
     regime: Regime
 
@@ -50,7 +48,6 @@ class VVIXReading:
 class DataHealth:
     vvix_degraded: bool = False
     vx_chain_partial: bool = False
-    spx_history_gap: bool = False
     auth_refresh_failed: bool = False
     history_partial: bool = False
     messages: list[str] = field(default_factory=list)
@@ -61,14 +58,12 @@ class DataHealth:
 
 @dataclass
 class Signal:
-    timestamp: datetime
     regime: Regime
     contango_pct: Decimal | None
     vvix: VVIXReading | None
     vrp: Decimal | None
     hv20: Decimal | None
     rules_fired: list[str]
-    health: DataHealth
 
 
 @dataclass

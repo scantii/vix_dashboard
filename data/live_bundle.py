@@ -31,16 +31,13 @@ def build_term_structure(
     active.sort(key=lambda c: c.expiration_date)
     front = active[: cfg.term_structure_months]
     prices: dict[str, Decimal] = {}
-    ordered: list[str] = []
-    for i, c in enumerate(front):
+    for c in front:
         sym = c.symbol
         q = quotes.get(sym) or quotes.get(sym.lstrip("/")) or quotes.get("/" + sym.lstrip("/"))
         if q:
             m = _mid(q)
             if m is not None:
                 prices[sym] = m
-                ordered.append(f"M{i+1}:{sym}")
-        c.is_front_month = i == 0
 
     contango: Decimal | None = None
     if len(front) >= 2:
@@ -54,7 +51,6 @@ def build_term_structure(
         contracts=front,
         prices_by_symbol=prices,
         spot_vix=spot_vix,
-        ordered_tenors=ordered,
         contango_pct=contango,
         regime=Regime.UNKNOWN,
     )

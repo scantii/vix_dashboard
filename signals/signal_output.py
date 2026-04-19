@@ -52,12 +52,10 @@ def build_live_signal(
     hv_dec = Decimal(str(hv20_f)) if hv20_f is not None else None
 
     return Signal(
-        timestamp=now,
         regime=regime,
         contango_pct=contango,
         vvix=vvix_read,
         vrp=vrp,
         hv20=hv_dec,
         rules_fired=rules,
-        health=health,
     )

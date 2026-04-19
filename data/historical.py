@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from datetime import date
 from pathlib import Path
-from typing import Protocol, runtime_checkable
 
 import pandas as pd
 
@@ -16,19 +15,6 @@ from vix_dashboard.data.yahoo_fallback import fetch_index_closes
 from vix_dashboard.auth.tasty_auth import TastyAuth
 
 logger = logging.getLogger(__name__)
-
-
-@runtime_checkable
-class HistoricalProvider(Protocol):
-    """Pluggable historical data source."""
-
-    def get_daily_panel(
-        self, start: date, end: date
-    ) -> tuple[pd.DataFrame, list[str]]:  # (df, notes)
-        """
-        Returns DataFrame columns: date, vix, vvix, spx, vx_front, vx_next (nullable).
-        Index: date (normalized to date, no tz).
-        """
 
 
 def _candles_to_series(candles: list[Candle]) -> pd.Series:

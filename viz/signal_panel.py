@@ -12,7 +12,6 @@ def make_health_banner(health: DataHealth) -> html.Div:
         (
             health.vvix_degraded,
             health.vx_chain_partial,
-            health.spx_history_gap,
             health.auth_refresh_failed,
             health.history_partial,
         )
@@ -25,8 +24,6 @@ def make_health_banner(health: DataHealth) -> html.Div:
         parts.append("VX chain partial. ")
     if health.vvix_degraded:
         parts.append("VVIX degraded. ")
-    if health.spx_history_gap:
-        parts.append("SPX gap. ")
     if health.history_partial:
         parts.append("History partial. ")
     for m in health.messages:
