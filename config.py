@@ -33,6 +33,23 @@ def _env(name: str, default: str | None = None) -> str | None:
     return v
 
 
+def _resolve_config_path(raw: str | None) -> str | None:
+    """
+    Turn optional env path into an absolute path: expand ${VAR} and ``~``,
+    then resolve relative paths against this package directory (same folder as ``config.py``).
+    """
+    if raw is None:
+        return None
+    s = raw.strip()
+    if not s:
+        return None
+    expanded = os.path.expandvars(os.path.expanduser(s))
+    p = Path(expanded)
+    if not p.is_absolute():
+        p = (Path(__file__).resolve().parent / p).resolve()
+    return str(p)
+
+
 @dataclass(frozen=True)
 class ApiConfig:
     """Tastytrade REST settings (see https://developer.tastytrade.com/)."""
@@ -102,10 +119,10 @@ class CsvFallbackConfig:
     """Optional panel CSV for offline / gap fill (date,vix,vvix,spx,f0,f1)."""
 
     panel_path: str | None = field(
-        default_factory=lambda: _env("VIX_PANEL_CSV")
+        default_factory=lambda: _resolve_config_path(_env("VIX_PANEL_CSV"))
     )
     vvix_series_path: str | None = field(
-        default_factory=lambda: _env("VVIX_CSV")
+        default_factory=lambda: _resolve_config_path(_env("VVIX_CSV"))
     )
 
 
