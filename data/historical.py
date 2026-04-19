@@ -13,6 +13,7 @@ import pandas as pd
 from vix_dashboard.config import AppConfig
 from vix_dashboard.data.fetcher import FetcherError, fetch_history_candles, list_vx_futures
 from vix_dashboard.data.models import Candle, HistoricalPanelRow
+from vix_dashboard.data.yahoo_fallback import fetch_index_closes
 from vix_dashboard.auth.tasty_auth import TastyAuth
 
 logger = logging.getLogger(__name__)
@@ -89,10 +90,17 @@ class TastyHistoricalProvider:
                 )
             except FetcherError as e:
                 notes.append(f"{sym}: {e}")
-                return pd.Series(dtype="float64")
-            if not c:
-                notes.append(f"{sym}: empty history")
-            return _candles_to_series(c)
+                c = []
+            if c:
+                return _candles_to_series(c)
+            ymap = fetch_index_closes([sym], sc, start, end)
+            if sym in ymap and not ymap[sym].empty:
+                notes.append(
+                    f"{sym}: filled from Yahoo Finance (Tasty candle history unavailable)"
+                )
+                return ymap[sym]
+            notes.append(f"{sym}: empty history")
+            return pd.Series(dtype="float64")
 
         vix_s = load(sc.vix_index)
         vvix_s = load(sc.vvix_index)

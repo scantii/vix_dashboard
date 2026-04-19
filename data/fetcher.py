@@ -6,6 +6,7 @@ import logging
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
+from urllib.parse import quote
 
 from vix_dashboard.auth.tasty_auth import TastyAuth, safe_request
 from vix_dashboard.config import AppConfig
@@ -179,7 +180,11 @@ def fetch_history_candles(
     if err or resp is None:
         raise FetcherError(err or "no response")
     if resp.status_code == 404:
-        logger.warning("History 404 for %s — check history_path and params in config", sym)
+        logger.debug(
+            "History 404 for %s at %s (often absent on REST; Yahoo fallback may apply)",
+            sym,
+            cfg.api.history_path,
+        )
         return []
     if resp.status_code // 100 != 2:
         raise FetcherError(f"history {resp.status_code}: {resp.text[:500]}")
