@@ -11,7 +11,9 @@ id_rsa
 *.pfx
 
 # Python
+**/__pycache__/
 __pycache__/
+*.pyc
 *.py[cod]
 *$py.class
 *.so
