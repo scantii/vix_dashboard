@@ -36,14 +36,19 @@ def create_app(cfg=None) -> Dash:
                 [
                     html.Div(id="health-banner"),
                     html.Div(
-                        style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px"},
+                        style={
+                            "display": "grid",
+                            "gridTemplateColumns": "1fr 1fr",
+                            "gap": "12px",
+                            "alignItems": "start",
+                        },
                         children=[
                             dcc.Graph(id="graph-term-structure"),
                             dcc.Graph(id="graph-vvix"),
+                            html.Div(id="panel-signal"),
+                            dcc.Graph(id="graph-spx"),
                         ],
                     ),
-                    dcc.Graph(id="graph-spx"),
-                    html.Div(id="panel-signal"),
                 ]
             ),
         ],
