@@ -7,12 +7,14 @@ from __future__ import annotations
 
 import logging
 
+# No INFO lines on stderr: only WARNING and above (from any logger).
+logging.basicConfig(level=logging.WARNING, force=True)
+
 from dash import Dash, Input, Output, callback, dcc, html
 
 from vix_dashboard.app_service import _auth_optional, refresh_dashboard
 from vix_dashboard.config import load_config
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

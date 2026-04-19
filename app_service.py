@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -19,15 +19,59 @@ from vix_dashboard.data.historical import (
     TastyHistoricalProvider,
 )
 from vix_dashboard.data.live_bundle import build_term_structure
-from vix_dashboard.data.models import DataHealth
+from vix_dashboard.data.models import DataHealth, Signal
 from vix_dashboard.data.yahoo_fallback import fetch_vvix_sparkline
 from vix_dashboard.signals.signal_output import build_live_signal
-from vix_dashboard.viz.signal_panel import make_health_banner, make_signal_summary_div
+from vix_dashboard.viz.signal_panel import make_health_banner
 from vix_dashboard.viz.spx_panel import make_spx_figure
 from vix_dashboard.viz.term_structure import make_term_structure_figure
 from vix_dashboard.viz.vvix_panel import make_vvix_figure
 
 logger = logging.getLogger(__name__)
+
+_Q2 = Decimal("0.01")
+
+
+def _fmt_2dp(val: object) -> str:
+    """Round to hundredths for UI. Never use str(Decimal) for output (unbounded digits)."""
+    if val is None:
+        return "—"
+    if hasattr(val, "item"):
+        try:
+            val = val.item()
+        except Exception:
+            pass
+    d = val if isinstance(val, Decimal) else Decimal(str(val))
+    return format(d.quantize(_Q2, rounding=ROUND_HALF_UP), "f")
+
+
+def _live_signal_div(sig: Signal) -> html.Div:
+    """Built next to refresh_dashboard so the running process always uses this formatting."""
+    lines = [
+        f"Regime: {sig.regime.value}",
+        f"VRP:    {_fmt_2dp(sig.vrp)}",
+        f"HV20:   {_fmt_2dp(sig.hv20)}",
+    ]
+    if sig.vvix:
+        lines.append(f"VVIX:   {_fmt_2dp(sig.vvix.vvix)} (n={int(sig.vvix.raw_history_len)})")
+    block = "\n".join(lines)
+    rules = html.Ul([html.Li(r) for r in sig.rules_fired])
+    return html.Div(
+        [
+            html.H4("Live signal"),
+            html.Pre(
+                block,
+                style={
+                    "fontFamily": "system-ui, sans-serif",
+                    "fontSize": "14px",
+                    "margin": "0 0 0.75em 0",
+                    "whiteSpace": "pre-wrap",
+                },
+            ),
+            html.P("Rules:"),
+            rules,
+        ]
+    )
 
 
 def _auth_optional(cfg: AppConfig) -> TastyAuth | None:
@@ -133,7 +177,7 @@ def refresh_dashboard(cfg: AppConfig, auth: TastyAuth | None) -> tuple:
     spx_x = list(spx_spark.index) if len(spx_spark) else None
     spx_fig = make_spx_figure(sparkline_y=spx_y, sparkline_x=spx_x)
 
-    sig_div = make_signal_summary_div(sig)
+    sig_div = _live_signal_div(sig)
 
     return (
         make_health_banner(health),

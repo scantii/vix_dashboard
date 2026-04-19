@@ -187,7 +187,7 @@ def fetch_history_candles(
         raise FetcherError(err or "no response")
     if resp.status_code == 404:
         if not _tasty_history_endpoint_dead:
-            logger.info(
+            logger.debug(
                 "Tasty REST %s returned 404; skipping further history GETs this session "
                 "(indices use Yahoo fallback where implemented).",
                 cfg.api.history_path,
