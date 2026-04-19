@@ -1,0 +1,1 @@
+"""Plotly figures for Dash."""
