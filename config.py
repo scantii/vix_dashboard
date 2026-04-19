@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -69,7 +68,6 @@ class ApiConfig:
     # for candles—not on a stable REST pull—so we fall back to Yahoo Finance for daily index
     # history. See developer.tastytrade.com/streaming-market-data/ for streaming candles.
     history_path: str = "/market-data/history"
-    history_params_style: str = "kebab"
 
 
 @dataclass(frozen=True)
@@ -79,7 +77,6 @@ class SymbolConfig:
     vix_index: str = "VIX"
     vvix_index: str = "VVIX"
     spx_index: str = "SPX"
-    vx_exchange: str = "CFE"
     vx_product_code: str = "VX"
     # Instrument types for market-data paths (must match API enum strings).
     index_instrument_type: str = "Index"
@@ -121,9 +118,6 @@ class CsvFallbackConfig:
     panel_path: str | None = field(
         default_factory=lambda: _resolve_config_path(_env("VIX_PANEL_CSV"))
     )
-    vvix_series_path: str | None = field(
-        default_factory=lambda: _resolve_config_path(_env("VVIX_CSV"))
-    )
 
 
 @dataclass(frozen=True)
@@ -152,7 +146,3 @@ def oauth_credentials() -> tuple[str, str]:
             "Set TT_SECRET (OAuth client secret) and TT_REFRESH (refresh token) in the environment."
         )
     return secret, refresh
-
-
-def timedelta_refresh(cfg: AppConfig) -> timedelta:
-    return timedelta(seconds=cfg.dash.refresh_seconds)

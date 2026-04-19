@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Any
 
 
 class Regime(str, Enum):
@@ -91,27 +90,3 @@ class QuoteSnapshot:
     updated_at: datetime | None
 
 
-@dataclass
-class HistoricalPanelRow:
-    """One trading day for signal features."""
-
-    d: date
-    vix: Decimal | None
-    vvix: Decimal | None
-    spx: Decimal | None
-    vx_front: Decimal | None
-    vx_next: Decimal | None
-
-
-def panel_to_dict_rows(rows: list[HistoricalPanelRow]) -> list[dict[str, Any]]:
-    return [
-        {
-            "date": r.d.isoformat(),
-            "vix": float(r.vix) if r.vix is not None else None,
-            "vvix": float(r.vvix) if r.vvix is not None else None,
-            "spx": float(r.spx) if r.spx is not None else None,
-            "vx_front": float(r.vx_front) if r.vx_front is not None else None,
-            "vx_next": float(r.vx_next) if r.vx_next is not None else None,
-        }
-        for r in rows
-    ]

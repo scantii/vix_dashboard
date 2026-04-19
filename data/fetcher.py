@@ -6,7 +6,6 @@ import logging
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
-from urllib.parse import quote
 
 from vix_dashboard.auth.tasty_auth import TastyAuth, safe_request
 from vix_dashboard.config import AppConfig
@@ -208,32 +207,3 @@ def fetch_history_candles(
     if out:
         _tasty_history_endpoint_dead = False
     return out
-
-
-def fetch_single_quote(
-    auth: TastyAuth,
-    cfg: AppConfig,
-    symbol: str,
-    instrument_type: str,
-) -> QuoteSnapshot | None:
-    """GET /market-data/{InstrumentType}/{symbol}"""
-    sym = quote(symbol, safe="")
-    path = f"/market-data/{instrument_type}/{sym}"
-    resp, err = safe_request(auth, "GET", path)
-    if err or resp is None:
-        return None
-    if resp.status_code // 100 != 2:
-        return None
-    data = _unwrap_data(resp.json())
-    ts_raw = data.get("updated-at") or data.get("updated_at")
-    if isinstance(ts_raw, str):
-        ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
-    else:
-        ts = ts_raw
-    return QuoteSnapshot(
-        symbol=data.get("symbol", symbol),
-        mark=_decimal(data.get("mark")),
-        bid=_decimal(data.get("bid")),
-        ask=_decimal(data.get("ask")),
-        updated_at=ts,
-    )

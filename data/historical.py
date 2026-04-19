@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from datetime import date
-from decimal import Decimal
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -12,7 +11,7 @@ import pandas as pd
 
 from vix_dashboard.config import AppConfig
 from vix_dashboard.data.fetcher import FetcherError, fetch_history_candles, list_vx_futures
-from vix_dashboard.data.models import Candle, FuturesContract, HistoricalPanelRow
+from vix_dashboard.data.models import Candle, FuturesContract
 from vix_dashboard.data.yahoo_fallback import fetch_index_closes
 from vix_dashboard.auth.tasty_auth import TastyAuth
 
@@ -222,33 +221,3 @@ class ChainedHistoricalProvider:
                 df[col] = df[col].combine_first(cdf[col])
         df = df.reset_index()
         return df, notes
-
-
-def panel_df_to_rows(df: pd.DataFrame) -> list[HistoricalPanelRow]:
-    out: list[HistoricalPanelRow] = []
-    for _, r in df.iterrows():
-        d = r["date"]
-        if isinstance(d, pd.Timestamp):
-            dd = d.date()
-        else:
-            dd = d
-        out.append(
-            HistoricalPanelRow(
-                d=dd,
-                vix=_maybe_dec(r.get("vix")),
-                vvix=_maybe_dec(r.get("vvix")),
-                spx=_maybe_dec(r.get("spx")),
-                vx_front=_maybe_dec(r.get("vx_front")),
-                vx_next=_maybe_dec(r.get("vx_next")),
-            )
-        )
-    return out
-
-
-def _maybe_dec(v: object) -> Decimal | None:
-    if v is None or (isinstance(v, float) and v != v):
-        return None
-    try:
-        return Decimal(str(float(v)))
-    except (TypeError, ValueError):
-        return None

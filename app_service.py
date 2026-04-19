@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 from dash import html
 
 from vix_dashboard.auth.tasty_auth import AuthError, TastyAuth
-from vix_dashboard.config import AppConfig, load_config
+from vix_dashboard.config import AppConfig
 from vix_dashboard.data.fetcher import FetcherError, fetch_quotes_by_type, list_vx_futures
 from vix_dashboard.data.historical import (
     ChainedHistoricalProvider,
@@ -135,7 +135,3 @@ def refresh_dashboard(cfg: AppConfig, auth: TastyAuth | None) -> tuple:
         sig_div,
         now.isoformat(),
     )
-
-
-def default_config() -> AppConfig:
-    return load_config()
