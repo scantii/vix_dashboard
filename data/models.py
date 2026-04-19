@@ -70,7 +70,6 @@ class Signal:
     hv20: Decimal | None
     rules_fired: list[str]
     health: DataHealth
-    live_vs_backtest_note: str | None = None
 
 
 @dataclass
@@ -93,47 +92,8 @@ class QuoteSnapshot:
 
 
 @dataclass
-class BacktestTrade:
-    entry_date: date
-    exit_date: date
-    regime: Regime
-    side: str  # "long_call" | "long_put"
-    pnl_dollars: Decimal
-    entry_vix: Decimal
-    exit_vix: Decimal
-
-
-@dataclass
-class RegimeStats:
-    regime: Regime
-    trade_count: int
-    win_rate: Decimal | None
-    avg_pnl: Decimal | None
-    max_drawdown: Decimal | None
-
-
-@dataclass
-class BacktestSummary:
-    trades: list[BacktestTrade]
-    by_regime: dict[Regime, RegimeStats]
-    overall_win_rate: Decimal | None
-    overall_avg_pnl: Decimal | None
-
-
-@dataclass
-class DashboardState:
-    """Bundle for the UI layer."""
-
-    term_structure: TermStructure | None
-    vvix_reading: VVIXReading | None
-    signal: Signal
-    backtest: BacktestSummary | None
-    health: DataHealth
-
-
-@dataclass
 class HistoricalPanelRow:
-    """One trading day for signal + backtest replay."""
+    """One trading day for signal features."""
 
     d: date
     vix: Decimal | None

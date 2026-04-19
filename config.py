@@ -47,10 +47,11 @@ class ApiConfig:
         or "vix-dashboard / 1.0.0"
     )
     oauth_token_path: str = "/oauth/token"
-    # Confirm against current OpenAPI: developer.tastytrade.com/open-api-spec/market-data/
-    # Typical pattern: GET with symbol, instrument-type, interval, start-time, end-time (kebab-case).
+    # Historical OHLC via REST: the public API does not expose a working candle/history route
+    # at this path (responses are 404). The official Python SDK also relies on DXLink streaming
+    # for candles—not on a stable REST pull—so we fall back to Yahoo Finance for daily index
+    # history. See developer.tastytrade.com/streaming-market-data/ for streaming candles.
     history_path: str = "/market-data/history"
-    # Query param names (kebab-case per API conventions); adjust if OpenAPI differs.
     history_params_style: str = "kebab"
 
 
@@ -91,25 +92,8 @@ class VrpConfig:
 
 
 @dataclass(frozen=True)
-class BacktestConfig:
-    """Walk-forward backtest; Tier A: delta-scaled VIX options P&L proxy."""
-
-    start_offset_days: int = 750  # history to pull / panel length
-    hold_days: int = 5
-    target_delta: Decimal = Decimal("0.30")
-    target_dte_days: int = 30
-    # Standard VIX options: $100 per index point per contract (approximation).
-    dollars_per_vix_point: Decimal = Decimal("100")
-    # Signal → position: long call when long_vol, long put when short_vol
-    long_vol_vrp_min: Decimal = Decimal("0.0")
-    short_vol_vrp_max: Decimal = Decimal("0.0")
-    min_vvix_pct_for_short_vol: Decimal = Decimal("70.0")  # high fear → favor puts / short vol plays
-
-
-@dataclass(frozen=True)
 class DashConfig:
     refresh_seconds: int = 60
-    backtest_refresh_seconds: int = 3600
     title: str = "VIX term structure & regime dashboard"
 
 
@@ -132,7 +116,6 @@ class AppConfig:
     regime: RegimeConfig = field(default_factory=RegimeConfig)
     vvix: VvixConfig = field(default_factory=VvixConfig)
     vrp: VrpConfig = field(default_factory=VrpConfig)
-    backtest: BacktestConfig = field(default_factory=BacktestConfig)
     dash: DashConfig = field(default_factory=DashConfig)
     csv: CsvFallbackConfig = field(default_factory=CsvFallbackConfig)
     term_structure_months: int = 6  # number of front months to show live

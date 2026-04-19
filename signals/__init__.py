@@ -1,1 +1,1 @@
-"""Signal logic: regime, VVIX, VRP, backtest."""
+"""Signal logic: regime, VVIX, VRP."""

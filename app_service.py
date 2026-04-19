@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, timedelta, timezone
-from typing import Any
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -20,20 +19,13 @@ from vix_dashboard.data.historical import (
 )
 from vix_dashboard.data.live_bundle import build_term_structure
 from vix_dashboard.data.models import DataHealth
-from vix_dashboard.signals.backtest import run_walk_forward
+from vix_dashboard.data.yahoo_fallback import fetch_vvix_sparkline
 from vix_dashboard.signals.signal_output import build_live_signal
-from vix_dashboard.viz.signal_panel import (
-    make_backtest_figure,
-    make_backtest_table,
-    make_health_banner,
-    make_signal_summary_div,
-)
+from vix_dashboard.viz.signal_panel import make_health_banner, make_signal_summary_div
 from vix_dashboard.viz.term_structure import make_term_structure_figure
 from vix_dashboard.viz.vvix_panel import make_vvix_figure
 
 logger = logging.getLogger(__name__)
-
-_BACKTEST_CACHE: dict[str, Any] = {"as_of_date": None, "summary": None}
 
 
 def _auth_optional(cfg: AppConfig) -> TastyAuth | None:
@@ -44,7 +36,7 @@ def _auth_optional(cfg: AppConfig) -> TastyAuth | None:
         return None
 
 
-def _spot_vix(quotes: dict, sym: str) -> Any:
+def _spot_vix(quotes: dict, sym: str) -> object | None:
     keys = (sym, sym.upper(), f"${sym.lstrip('$')}", f"${sym}")
     for k in keys:
         if k in quotes:
@@ -57,14 +49,10 @@ def _spot_vix(quotes: dict, sym: str) -> Any:
     return None
 
 
-def refresh_dashboard(
-    cfg: AppConfig,
-    auth: TastyAuth | None,
-    triggered_id: str | None,
-) -> tuple:
+def refresh_dashboard(cfg: AppConfig, auth: TastyAuth | None) -> tuple:
     """
     Returns tuple for Dash outputs:
-    health, ts_fig, vvix_fig, signal_div, bt_fig, bt_table, last_updated
+    health, ts_fig, vvix_fig, signal_div, last_updated
     """
     health = DataHealth()
     now = datetime.now(timezone.utc)
@@ -77,8 +65,6 @@ def refresh_dashboard(
             make_term_structure_figure(None, None),
             make_vvix_figure(None),
             html.Div("No auth"),
-            empty,
-            make_backtest_table(None),
             now.isoformat(),
         )
 
@@ -110,7 +96,6 @@ def refresh_dashboard(
     spot_dec = Decimal(str(float(spot))) if spot is not None else None
     ts = build_term_structure(contracts, quotes, spot_dec, cfg, as_of=now) if contracts else None
 
-    # Historical series for features (shorter window)
     end = date.today()
     start = end - timedelta(days=400)
     csvp = None
@@ -134,38 +119,21 @@ def refresh_dashboard(
     sig = build_live_signal(ts, vvix_series, spx_series, now, health, cfg)
 
     ts_fig = make_term_structure_figure(ts, sig.regime)
-    spark = vvix_series.tail(60).tolist() if len(vvix_series) else None
-    vvix_fig = make_vvix_figure(sig.vvix, sparkline_y=spark)
+
+    spark_tail = vvix_series.tail(60)
+    if spark_tail.empty:
+        spark_tail = fetch_vvix_sparkline(sc, 60, end=end)
+    spark_y = spark_tail.tolist()
+    spark_x = list(spark_tail.index) if len(spark_tail) else None
+    vvix_fig = make_vvix_figure(sig.vvix, sparkline_y=spark_y, sparkline_x=spark_x)
+
     sig_div = make_signal_summary_div(sig)
-
-    # Backtest: not on every live tick — only new day, missing cache, or backtest interval
-    global _BACKTEST_CACHE
-    today = date.today()
-    run_bt = (
-        _BACKTEST_CACHE["summary"] is None
-        or _BACKTEST_CACHE["as_of_date"] != today
-        or triggered_id == "interval-bt"
-    )
-    if run_bt:
-        bt_start = today - timedelta(days=cfg.backtest.start_offset_days)
-        bt_panel, _ = chain.get_daily_panel(bt_start, today)
-        if bt_panel.empty:
-            _BACKTEST_CACHE["summary"] = None
-        else:
-            _BACKTEST_CACHE["summary"] = run_walk_forward(bt_panel, cfg)
-        _BACKTEST_CACHE["as_of_date"] = today
-
-    summary = _BACKTEST_CACHE.get("summary")
-    bt_fig = make_backtest_figure(summary)
-    bt_table = make_backtest_table(summary)
 
     return (
         make_health_banner(health),
         ts_fig,
         vvix_fig,
         sig_div,
-        bt_fig,
-        bt_table,
         now.isoformat(),
     )
 

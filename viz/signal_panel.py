@@ -1,11 +1,10 @@
-"""Signal summary and backtest stats tables."""
+"""Signal summary and health banner."""
 
 from __future__ import annotations
 
-import plotly.graph_objects as go
 from dash import html
 
-from vix_dashboard.data.models import BacktestSummary, DataHealth, Signal
+from vix_dashboard.data.models import DataHealth, Signal
 
 
 def make_health_banner(health: DataHealth) -> html.Div:
@@ -57,70 +56,5 @@ def make_signal_summary_div(sig: Signal) -> html.Div:
             html.Table(rows),
             html.P("Rules:"),
             rules,
-            html.P(sig.live_vs_backtest_note or "", style={"fontSize": "12px", "color": "#666"}),
         ]
     )
-
-
-def make_backtest_figure(summary: BacktestSummary | None) -> go.Figure:
-    fig = go.Figure()
-    if not summary or not summary.by_regime:
-        fig.update_layout(title="Backtest (no data)", height=280)
-        return fig
-    regs = []
-    wins = []
-    avgs = []
-    for rg, st in summary.by_regime.items():
-        if st.trade_count == 0:
-            continue
-        regs.append(rg.value)
-        wins.append(float(st.win_rate or 0))
-        avgs.append(float(st.avg_pnl or 0))
-    fig.add_trace(go.Bar(x=regs, y=wins, name="Win rate %"))
-    fig.update_layout(title="Backtest win rate by regime", yaxis_title="%", height=320)
-    return fig
-
-
-def make_backtest_table(summary: BacktestSummary | None) -> html.Table:
-    if not summary:
-        return html.Table([html.Tr([html.Td("No backtest yet")])])
-    head = html.Tr(
-        [
-            html.Th("Regime"),
-            html.Th("Trades"),
-            html.Th("Win %"),
-            html.Th("Avg PnL $"),
-            html.Th("Max DD $"),
-        ]
-    )
-    body = []
-    for rg, st in summary.by_regime.items():
-        body.append(
-            html.Tr(
-                [
-                    html.Td(rg.value),
-                    html.Td(str(st.trade_count)),
-                    html.Td(f"{float(st.win_rate):.1f}" if st.win_rate is not None else "—"),
-                    html.Td(f"{float(st.avg_pnl):.2f}" if st.avg_pnl is not None else "—"),
-                    html.Td(f"{float(st.max_drawdown):.2f}" if st.max_drawdown is not None else "—"),
-                ]
-            )
-        )
-    ov = html.Tr(
-        [
-            html.Td("Overall"),
-            html.Td(str(len(summary.trades))),
-            html.Td(
-                f"{float(summary.overall_win_rate):.1f}"
-                if summary.overall_win_rate is not None
-                else "—"
-            ),
-            html.Td(
-                f"{float(summary.overall_avg_pnl):.2f}"
-                if summary.overall_avg_pnl is not None
-                else "—"
-            ),
-            html.Td("—"),
-        ]
-    )
-    return html.Table([head] + body + [ov], style={"width": "100%", "fontSize": "14px"})

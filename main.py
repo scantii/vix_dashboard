@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 
-from dash import Dash, Input, Output, callback, callback_context, dcc, html
+from dash import Dash, Input, Output, callback, dcc, html
 
 from vix_dashboard.app_service import _auth_optional, refresh_dashboard
 from vix_dashboard.config import load_config
@@ -32,11 +32,6 @@ def create_app(cfg=None) -> Dash:
                 interval=cfg.dash.refresh_seconds * 1000,
                 n_intervals=0,
             ),
-            dcc.Interval(
-                id="interval-bt",
-                interval=cfg.dash.backtest_refresh_seconds * 1000,
-                n_intervals=0,
-            ),
             dcc.Loading(
                 [
                     html.Div(id="health-banner"),
@@ -47,18 +42,7 @@ def create_app(cfg=None) -> Dash:
                             dcc.Graph(id="graph-vvix"),
                         ],
                     ),
-                    html.Div(
-                        style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px"},
-                        children=[
-                            html.Div(id="panel-signal"),
-                            html.Div(
-                                [
-                                    dcc.Graph(id="graph-backtest"),
-                                    html.Div(id="table-backtest"),
-                                ]
-                            ),
-                        ],
-                    ),
+                    html.Div(id="panel-signal"),
                 ]
             ),
         ],
@@ -70,17 +54,11 @@ def create_app(cfg=None) -> Dash:
         Output("graph-term-structure", "figure"),
         Output("graph-vvix", "figure"),
         Output("panel-signal", "children"),
-        Output("graph-backtest", "figure"),
-        Output("table-backtest", "children"),
         Output("last-updated", "children"),
         Input("interval-live", "n_intervals"),
-        Input("interval-bt", "n_intervals"),
     )
-    def _on_tick(_live: int, _bt: int) -> tuple:
-        trig: str | None = None
-        if callback_context.triggered:
-            trig = callback_context.triggered[0]["prop_id"].split(".")[0]
-        return refresh_dashboard(cfg, auth, trig)
+    def _on_tick(_live: int) -> tuple:
+        return refresh_dashboard(cfg, auth)
 
     return app
 

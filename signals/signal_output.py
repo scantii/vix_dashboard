@@ -60,11 +60,4 @@ def build_live_signal(
         hv20=hv_dec,
         rules_fired=rules,
         health=health,
-        live_vs_backtest_note="Backtest uses Tier A delta proxy; not live execution.",
     )
-
-
-def merge_with_backtest_note(sig: Signal, note: str | None) -> Signal:
-    if note:
-        sig.live_vs_backtest_note = note
-    return sig
