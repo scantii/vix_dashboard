@@ -12,7 +12,7 @@ import pandas as pd
 
 from vix_dashboard.config import AppConfig
 from vix_dashboard.data.fetcher import FetcherError, fetch_history_candles, list_vx_futures
-from vix_dashboard.data.models import Candle, HistoricalPanelRow
+from vix_dashboard.data.models import Candle, FuturesContract, HistoricalPanelRow
 from vix_dashboard.data.yahoo_fallback import fetch_index_closes
 from vix_dashboard.auth.tasty_auth import TastyAuth
 
@@ -71,7 +71,13 @@ class TastyHistoricalProvider:
         self.auth = auth
         self.cfg = cfg
 
-    def get_daily_panel(self, start: date, end: date) -> tuple[pd.DataFrame, list[str]]:
+    def get_daily_panel(
+        self,
+        start: date,
+        end: date,
+        *,
+        vx_contracts: list[FuturesContract] | None = None,
+    ) -> tuple[pd.DataFrame, list[str]]:
         notes: list[str] = []
         sc = self.cfg.symbols
         idx_type = sc.index_instrument_type
@@ -106,11 +112,14 @@ class TastyHistoricalProvider:
         vvix_s = load(sc.vvix_index)
         spx_s = load(sc.spx_index)
 
-        try:
-            contracts = [c for c in list_vx_futures(self.auth, self.cfg) if c.expiration_date >= start]
-        except FetcherError as e:
-            notes.append(f"futures list: {e}")
-            contracts = []
+        if vx_contracts is not None:
+            contracts = [c for c in vx_contracts if c.expiration_date >= start]
+        else:
+            try:
+                contracts = [c for c in list_vx_futures(self.auth, self.cfg) if c.expiration_date >= start]
+            except FetcherError as e:
+                notes.append(f"futures list: {e}")
+                contracts = []
 
         contracts.sort(key=lambda x: x.expiration_date)
         # Limit to reasonable number of contracts to query
@@ -190,8 +199,14 @@ class ChainedHistoricalProvider:
         self.primary = primary
         self.csv = csv
 
-    def get_daily_panel(self, start: date, end: date) -> tuple[pd.DataFrame, list[str]]:
-        df, notes = self.primary.get_daily_panel(start, end)
+    def get_daily_panel(
+        self,
+        start: date,
+        end: date,
+        *,
+        vx_contracts: list[FuturesContract] | None = None,
+    ) -> tuple[pd.DataFrame, list[str]]:
+        df, notes = self.primary.get_daily_panel(start, end, vx_contracts=vx_contracts)
         if self.csv is None:
             return df, notes
         cdf, cnotes = self.csv.get_daily_panel(start, end)

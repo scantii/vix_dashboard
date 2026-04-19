@@ -14,6 +14,9 @@ from vix_dashboard.data.models import Candle, FuturesContract, QuoteSnapshot
 
 logger = logging.getLogger(__name__)
 
+# After one 404 on the REST history route, skip further GETs for this process (same endpoint).
+_tasty_history_endpoint_dead: bool = False
+
 
 class FetcherError(Exception):
     """API or parsing error."""
@@ -168,6 +171,10 @@ def fetch_history_candles(
     GET {history_path} with instrument type and symbol.
     Tastytrade OpenAPI: confirm parameter names against live spec; this uses kebab-case.
     """
+    global _tasty_history_endpoint_dead
+    if _tasty_history_endpoint_dead:
+        return []
+
     sym = symbol.lstrip("/")
     params: dict[str, Any] = {
         "symbol": sym,
@@ -180,6 +187,13 @@ def fetch_history_candles(
     if err or resp is None:
         raise FetcherError(err or "no response")
     if resp.status_code == 404:
+        if not _tasty_history_endpoint_dead:
+            logger.info(
+                "Tasty REST %s returned 404; skipping further history GETs this session "
+                "(indices use Yahoo fallback where implemented).",
+                cfg.api.history_path,
+            )
+        _tasty_history_endpoint_dead = True
         logger.debug(
             "History 404 for %s at %s (often absent on REST; Yahoo fallback may apply)",
             sym,
@@ -190,7 +204,10 @@ def fetch_history_candles(
         raise FetcherError(f"history {resp.status_code}: {resp.text[:500]}")
     body = resp.json()
     data = body.get("data") or body
-    return _parse_candle_rows(data if isinstance(data, dict) else {"items": data})
+    out = _parse_candle_rows(data if isinstance(data, dict) else {"items": data})
+    if out:
+        _tasty_history_endpoint_dead = False
+    return out
 
 
 def fetch_single_quote(

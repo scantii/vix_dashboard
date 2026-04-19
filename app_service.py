@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -91,8 +92,6 @@ def refresh_dashboard(cfg: AppConfig, auth: TastyAuth | None) -> tuple:
         quotes = {}
 
     spot = _spot_vix(quotes, sc.vix_index)
-    from decimal import Decimal
-
     spot_dec = Decimal(str(float(spot))) if spot is not None else None
     ts = build_term_structure(contracts, quotes, spot_dec, cfg, as_of=now) if contracts else None
 
@@ -103,7 +102,7 @@ def refresh_dashboard(cfg: AppConfig, auth: TastyAuth | None) -> tuple:
         csvp = CsvHistoricalProvider(cfg.csv.panel_path)
     tasty_h = TastyHistoricalProvider(auth, cfg)
     chain = ChainedHistoricalProvider(tasty_h, csvp)
-    panel_df, hist_notes = chain.get_daily_panel(start, end)
+    panel_df, hist_notes = chain.get_daily_panel(start, end, vx_contracts=contracts)
     for n in hist_notes:
         health.add(n)
     if hist_notes:
