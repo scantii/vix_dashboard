@@ -3,6 +3,13 @@
 .env.*
 !.env.example
 
+# Extra secret / credential files (never commit)
+*.pem
+*.key
+id_rsa
+*.p12
+*.pfx
+
 # Python
 __pycache__/
 *.py[cod]
@@ -40,11 +47,24 @@ env/
 htmlcov/
 .tox/
 .nox/
+.hypothesis/
+.dmypy.json
+
+# Optional local-only exports (panel CSVs, etc.)
+data/local/
 
 # Jupyter
 .ipynb_checkpoints/
 
+# Runtime / local dumps
+*.log
+logs/
+*.sqlite
+*.sqlite3
+
 # OS / editor
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 .idea/
