@@ -77,6 +77,7 @@ class SymbolConfig:
     vix_index: str = "VIX"
     vvix_index: str = "VVIX"
     spx_index: str = "SPX"
+    vix3m_index: str = "VIX3M"
     vx_product_code: str = "VX"
     # Instrument types for market-data paths (must match API enum strings).
     index_instrument_type: str = "Index"
@@ -135,6 +136,23 @@ class AppConfig:
 def load_config() -> AppConfig:
     """Default application configuration."""
     return AppConfig()
+
+
+# Regime / composite score thresholds (tune without changing calculation code).
+THRESHOLDS: dict[str, float] = {
+    "regime_green_yellow": 35.0,
+    "regime_yellow_red": 60.0,
+    "regime_red_entry": 80.0,
+    "red_to_yellow_exit": 50.0,
+    "vvix_early_warning_roc": 0.12,
+    "vix_early_warning_max_move": 0.08,
+    "term_ratio_backwardation": 1.0,
+    "term_ratio_panic": 1.10,
+    "term_ratio_contango_calm": 0.85,
+    "vrp_favorable": 3.0,
+    "correlation_breakdown": -0.5,
+    "normalize_window": 252.0,
+}
 
 
 def oauth_credentials() -> tuple[str, str]:

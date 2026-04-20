@@ -64,6 +64,11 @@ logs/
 *.sqlite
 *.sqlite3
 
+# Regime signal logs (local append-only artifacts)
+regime_signal_log.csv
+threshold_crossings.csv
+regime_signals.db
+
 # OS / editor
 .DS_Store
 Thumbs.db

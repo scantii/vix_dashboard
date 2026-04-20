@@ -29,9 +29,13 @@ def _candles_to_series(candles: list[Candle]) -> pd.Series:
 def _read_panel_csv(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path, parse_dates=["date"])
     df["date"] = pd.to_datetime(df["date"]).dt.normalize()
-    for col in ("vix", "vvix", "spx", "vx_front", "vx_next"):
+    for col in ("vix", "vvix", "spx", "vix3m", "vx_front", "vx_next"):
         if col not in df.columns:
             df[col] = pd.NA
+    for k in range(1, 9):
+        c = f"vx_m{k}"
+        if c not in df.columns:
+            df[c] = pd.NA
     return df.sort_values("date")
 
 
@@ -96,6 +100,10 @@ class TastyHistoricalProvider:
         vix_s = load(sc.vix_index)
         vvix_s = load(sc.vvix_index)
         spx_s = load(sc.spx_index)
+        vix3m_s = load(sc.vix3m_index)
+        if vix3m_s.empty:
+            y3 = fetch_index_closes([sc.vix3m_index], sc, start, end)
+            vix3m_s = y3.get(sc.vix3m_index, pd.Series(dtype="float64"))
 
         if vx_contracts is not None:
             contracts = [c for c in vx_contracts if c.expiration_date >= start]
@@ -129,7 +137,7 @@ class TastyHistoricalProvider:
                 notes.append(f"{sym}: {e}")
 
         idx_set: set[pd.Timestamp] = set()
-        for s in (vix_s, vvix_s, spx_s):
+        for s in (vix_s, vvix_s, spx_s, vix3m_s):
             idx_set |= set(s.index)
         for s in fut_frames.values():
             idx_set |= set(s.index)
@@ -147,6 +155,15 @@ class TastyHistoricalProvider:
             vx_next: float | None = None
             eligible = [sym for sym in exp_by_sym if exp_by_sym[sym] > d and sym in fut_frames]
             eligible.sort(key=lambda s: exp_by_sym[s])
+            vx_months: dict[str, float | None] = {}
+            for mi in range(1, 9):
+                key = f"vx_m{mi}"
+                if len(eligible) >= mi:
+                    sym_i = eligible[mi - 1]
+                    vi = fut_frames[sym_i].get(d_ts, float("nan"))
+                    vx_months[key] = None if vi != vi else float(vi)
+                else:
+                    vx_months[key] = None
             if len(eligible) >= 1:
                 s0 = eligible[0]
                 v0 = fut_frames[s0].get(d_ts, float("nan"))
@@ -156,16 +173,20 @@ class TastyHistoricalProvider:
                 v1 = fut_frames[s1].get(d_ts, float("nan"))
                 vx_next = None if v1 != v1 else v1
 
-            rows.append(
-                {
-                    "date": d_ts,
-                    "vix": vix_s.get(d_ts, float("nan")),
-                    "vvix": vvix_s.get(d_ts, float("nan")),
-                    "spx": spx_s.get(d_ts, float("nan")),
-                    "vx_front": vx_front,
-                    "vx_next": vx_next,
-                }
-            )
+            v3 = vix3m_s.get(d_ts, float("nan"))
+            vix3m_v = None if v3 != v3 else float(v3)
+
+            row = {
+                "date": d_ts,
+                "vix": vix_s.get(d_ts, float("nan")),
+                "vvix": vvix_s.get(d_ts, float("nan")),
+                "spx": spx_s.get(d_ts, float("nan")),
+                "vix3m": vix3m_v,
+                "vx_front": vx_front,
+                "vx_next": vx_next,
+            }
+            row.update(vx_months)
+            rows.append(row)
 
         df = pd.DataFrame(rows)
         if not df.empty:
@@ -202,7 +223,9 @@ class ChainedHistoricalProvider:
             return cdf, notes
         cdf = cdf.set_index("date")
         df = df.set_index("date")
-        for col in ("vix", "vvix", "spx", "vx_front", "vx_next"):
+        merge_cols = ["vix", "vvix", "spx", "vix3m", "vx_front", "vx_next"]
+        merge_cols += [f"vx_m{k}" for k in range(1, 9)]
+        for col in merge_cols:
             if col in cdf.columns:
                 df[col] = df[col].combine_first(cdf[col])
         df = df.reset_index()

@@ -34,6 +34,7 @@ def yahoo_ticker_for_index(sym: str, sc: SymbolConfig) -> str | None:
         sc.vix_index.upper(): "^VIX",
         sc.vvix_index.upper(): "^VVIX",
         sc.spx_index.upper(): "^GSPC",
+        sc.vix3m_index.upper(): "^VIX3M",
     }
     return m.get(base)
 
