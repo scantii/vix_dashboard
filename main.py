@@ -9,6 +9,10 @@ import logging
 
 # No INFO lines on stderr: only WARNING and above (from any logger).
 logging.basicConfig(level=logging.WARNING, force=True)
+logging.getLogger("tastytrade").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpx_ws").setLevel(logging.WARNING)
+logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
 from dash import Dash, Input, Output, State, callback, dcc, html
 
@@ -60,20 +64,39 @@ def create_app(cfg=None) -> Dash:
                                     dcc.Graph(id="graph-vvix"),
                                 ],
                             ),
-                            html.Div(id="regime-sidebar", style={"gridColumn": "1 / -1"}),
                             html.Div(
                                 style={
                                     "gridColumn": "1 / -1",
                                     "display": "grid",
-                                    "gridTemplateColumns": "1fr 1fr",
+                                    "gridTemplateColumns": "minmax(320px, 1fr) 1fr",
                                     "gap": "12px",
+                                    "alignItems": "start",
                                 },
                                 children=[
-                                    html.Div(id="panel-signal"),
+                                    html.Div(id="regime-sidebar"),
                                     dcc.Graph(id="graph-spx"),
                                 ],
                             ),
-                            dcc.Graph(id="graph-regime-history", style={"gridColumn": "1 / -1"}),
+                            html.Div(
+                                style={
+                                    "gridColumn": "1 / -1",
+                                    "display": "grid",
+                                    # Give the history chart more space; keep live signal readable but narrower.
+                                    "gridTemplateColumns": "minmax(300px, 420px) 1fr",
+                                    "gap": "12px",
+                                    "alignItems": "start",
+                                },
+                                children=[
+                                    html.Div(
+                                        id="panel-signal",
+                                        style={"width": "100%", "maxWidth": "420px"},
+                                    ),
+                                    dcc.Graph(
+                                        id="graph-regime-history",
+                                        style={"width": "100%"},
+                                    ),
+                                ],
+                            ),
                         ],
                     ),
                 ]
@@ -115,4 +138,9 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="127.0.0.1", port=8050)
+    # Debug reloader spawns multiple processes and can duplicate DXLink subscriptions.
+    # Opt-in via env var to keep default behavior stable.
+    import os
+
+    debug = os.environ.get("DASH_DEBUG", "").strip() in ("1", "true", "True", "yes", "YES")
+    app.run(debug=debug, host="127.0.0.1", port=8050)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from dash import dcc, html
@@ -116,40 +117,42 @@ def make_signal_component_table(
 
     tail = signals_df.tail(400)
 
+    _COL = {
+        "VX curve slope": "slope",
+        "VIX term ratio": "term_ratio",
+        "VVIX velocity": "vvix_roc_3d",
+        "VRP": "vrp",
+        "Curve convexity": "convexity",
+        "VIX/SPX corr": "corr_10d",
+    }
+
     def _series_for(name: str) -> pd.Series:
-        m = {
-            "VX curve slope": "slope",
-            "VIX term ratio": "term_ratio",
-            "VVIX velocity": "vvix_roc_3d",
-            "VRP": "vrp",
-            "Curve convexity": "convexity",
-            "VIX/SPX corr": "corr_10d",
-        }
-        col = m[name]
+        col = _COL[name]
         return tail[col] if col in tail.columns else pd.Series(dtype=float)
 
-    def _fmt_val(name: str, row: pd.Series) -> str:
-        if name == "VX curve slope":
-            v = row.get("slope")
-            return f"{float(v):.3f}" if v == v else "—"
-        if name == "VIX term ratio":
-            v = row.get("term_ratio")
-            return f"{float(v):.3f}" if v == v else "—"
-        if name == "VVIX velocity":
-            v = row.get("vvix_roc_3d")
-            return f"{float(v) * 100.0:.2f}%" if v == v else "—"
-        if name == "VRP":
-            v = row.get("vrp")
-            return f"{float(v):.2f}" if v == v else "—"
-        if name == "Curve convexity":
-            v = row.get("convexity")
-            return f"{float(v):.3f}" if v == v else "—"
-        if name == "VIX/SPX corr":
-            v = row.get("corr_10d")
-            return f"{float(v):.3f}" if v == v else "—"
-        return "—"
+    def _last_finite(col: str) -> float | None:
+        """Latest calendar row often has incomplete futures; use last finite value for display."""
+        if col not in signals_df.columns:
+            return None
+        s = pd.to_numeric(signals_df[col], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+        if s.empty:
+            return None
+        v = float(s.iloc[-1])
+        return v if math.isfinite(v) else None
 
-    last = signals_df.iloc[-1]
+    def _fmt_val(name: str) -> str:
+        col = _COL.get(name)
+        if not col:
+            return "—"
+        v = _last_finite(col)
+        if v is None:
+            return "—"
+        if name == "VVIX velocity":
+            return f"{v * 100.0:.2f}%"
+        if name == "VRP":
+            return f"{v:.2f}"
+        return f"{v:.3f}"
+
     names = [
         "VX curve slope",
         "VIX term ratio",
@@ -171,7 +174,7 @@ def make_signal_component_table(
                 [
                     html.Td(nm, style={"padding": "6px 8px", "fontSize": "13px"}),
                     html.Td(
-                        _fmt_val(nm, last),
+                        _fmt_val(nm),
                         style={"padding": "6px 8px", "fontSize": "13px", "fontFamily": "ui-monospace, monospace"},
                     ),
                     html.Td(
@@ -215,7 +218,14 @@ def make_signal_component_table(
             html.H4("Regime signals", style={"margin": "0 0 8px 0"}),
             tbl,
         ],
-        style={"border": "1px solid #e0e0e0", "borderRadius": "8px", "padding": "10px", "background": "#fafafa"},
+        style={
+            "border": "1px solid #e0e0e0",
+            "borderRadius": "8px",
+            "padding": "10px",
+            "background": "#fafafa",
+            "minWidth": "min(100%, 380px)",
+            "overflowX": "auto",
+        },
     )
 
 
@@ -227,8 +237,34 @@ def make_regime_history_figure(signals_df: pd.DataFrame) -> go.Figure:
         fig.update_layout(title="Regime score history", height=280, margin=dict(l=40, r=20, t=40, b=36))
         return fig
 
-    s = signals_df["composite_score"].sort_index()
-    idx = s.index
+    sdf = signals_df.sort_index()
+    s = sdf["composite_score"]
+
+    # Trim the leading warmup region where normalization defaults to 0.5, producing a
+    # flat composite score at ~50. Start the chart at the first \"real\" calculation.
+    start_ix = s.first_valid_index()
+    norm_cols = ["norm_slope", "norm_vvix_roc", "norm_term_ratio", "norm_vrp_inv"]
+    if all(c in sdf.columns for c in norm_cols):
+        n = sdf[norm_cols].apply(pd.to_numeric, errors="coerce")
+        moved = (n.sub(0.5).abs() > 1e-12).any(axis=1)
+        moved_ix = moved[moved].index.min()
+        if moved_ix is not None:
+            start_ix = moved_ix
+    else:
+        # Fallback: first point where score differs from the default 50 line.
+        diff_ix = (s - 50.0).abs().where(s.notna()).dropna()
+        if not diff_ix.empty:
+            start_ix = diff_ix.index[0]
+
+    # Only trim the *right* side too: don't extend into trailing NaNs.
+    last_valid = s.last_valid_index()
+    if last_valid is None or start_ix is None:
+        fig = go.Figure()
+        fig.update_layout(title="Regime score history", height=280, margin=dict(l=40, r=20, t=40, b=36))
+        return fig
+
+    s_plot = s.loc[start_ix:last_valid]
+    idx = s_plot.index
     x = [pd.Timestamp(t).date() if hasattr(t, "date") else t for t in idx]
 
     fig = go.Figure()
@@ -247,7 +283,7 @@ def make_regime_history_figure(signals_df: pd.DataFrame) -> go.Figure:
     fig.add_trace(
         go.Scatter(
             x=x,
-            y=s.tolist(),
+            y=s_plot.tolist(),
             mode="lines",
             name="Composite score",
             line=dict(color="#0d47a1", width=2),
@@ -255,7 +291,7 @@ def make_regime_history_figure(signals_df: pd.DataFrame) -> go.Figure:
         )
     )
 
-    ev = score_crossing_events(s, th)
+    ev = score_crossing_events(s_plot.dropna(), th)
     if not ev.empty:
         shapes = []
         ann = []

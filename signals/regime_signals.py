@@ -28,14 +28,24 @@ def _col(df: pd.DataFrame, name: str) -> pd.Series:
 
 
 def _vx_mi(df: pd.DataFrame, i: int) -> pd.Series:
+    """Month-i VX price. Prefer ``vx_m{i}`` when present; fill gaps from ``vx_front`` / ``vx_next``.
+
+    Panel CSV helpers may add ``vx_m1``/``vx_m2`` columns that are all-null while ``vx_front`` /
+    ``vx_next`` hold the real values — we must not let empty month columns shadow those aliases.
+    Also accepts ``M{i}`` from DXLink term-structure merges when ``vx_m{i}`` is absent.
+    """
     c = f"vx_m{i}"
+    mcol = f"M{i}"
+    s = pd.Series(np.nan, index=df.index, dtype="float64")
     if c in df.columns:
-        return pd.to_numeric(df[c], errors="coerce")
+        s = pd.to_numeric(df[c], errors="coerce")
+    if mcol in df.columns:
+        s = s.combine_first(pd.to_numeric(df[mcol], errors="coerce"))
     if i == 1 and "vx_front" in df.columns:
-        return pd.to_numeric(df["vx_front"], errors="coerce")
-    if i == 2 and "vx_next" in df.columns:
-        return pd.to_numeric(df["vx_next"], errors="coerce")
-    return pd.Series(np.nan, index=df.index, dtype="float64")
+        s = s.combine_first(pd.to_numeric(df["vx_front"], errors="coerce"))
+    elif i == 2 and "vx_next" in df.columns:
+        s = s.combine_first(pd.to_numeric(df["vx_next"], errors="coerce"))
+    return s
 
 
 def _norm_window(th: dict[str, float]) -> int:
@@ -98,6 +108,8 @@ def compute_regime_signals(
     df = panel.sort_values("date").copy()
     df["date"] = pd.to_datetime(df["date"]).dt.normalize()
     df = df.set_index("date")
+    if df.index.has_duplicates:
+        df = df[~df.index.duplicated(keep="last")]
 
     vix = _col(df, "vix")
     vvix = _col(df, "vvix")
@@ -109,10 +121,26 @@ def compute_regime_signals(
     m3 = _vx_mi(df, 3)
     m4 = _vx_mi(df, 4)
 
-    slope = m1 - m2
+    m1_m4_ratio_panel = _col(df, "m1_m4_ratio")
+    m4_eff = m4
+    if "m1_m4_ratio" in df.columns:
+        r14 = m1_m4_ratio_panel.where(m1_m4_ratio_panel.notna() & (m1_m4_ratio_panel.abs() > 1e-12))
+        inferred_m4 = m1 / r14
+        m4_eff = m4.where(m4.notna(), inferred_m4)
+
+    slope_core = m1 - m2
+    slope = slope_core
+    if "slope" in df.columns:
+        sp = _col(df, "slope")
+        slope = sp.where(sp.notna(), slope_core)
+
     slope_lag3 = slope.shift(3)
-    slope_roc_3d = (slope - slope_lag3) / slope_lag3.abs()
-    slope_roc_3d = slope_roc_3d.where(slope_lag3.notna() & (slope_lag3.abs() > 1e-12))
+    slope_roc_core = (slope - slope_lag3) / slope_lag3.abs()
+    slope_roc_core = slope_roc_core.where(slope_lag3.notna() & (slope_lag3.abs() > 1e-12))
+    slope_roc_3d = slope_roc_core
+    if "slope_roc_3d" in df.columns:
+        sr = _col(df, "slope_roc_3d")
+        slope_roc_3d = sr.where(sr.notna(), slope_roc_core)
 
     backwardation = slope > 0
     prev_roc = slope_roc_3d.shift(1)
@@ -122,7 +150,7 @@ def compute_regime_signals(
         & (prev_roc * slope_roc_3d < 0)
     )
 
-    term_denom = vix3m.where(vix3m.notna() & (vix3m > 0), m4)
+    term_denom = vix3m.where(vix3m.notna() & (vix3m > 0), m4_eff)
     term_ratio = (vix / term_denom).where(term_denom.notna() & (term_denom > 0))
 
     tr_cont = float(th["term_ratio_contango_calm"])
@@ -154,8 +182,15 @@ def compute_regime_signals(
     vrp = vix - hv20
 
     conv_denom = 2.0 * m2
-    convexity = (m1 + m3) / conv_denom
-    convexity = convexity.where(conv_denom.notna() & (conv_denom.abs() > 1e-12))
+    # If the third listed month is missing (only two VX contracts in panel), use M2 as a
+    # stand-in so (M1+M3)/(2*M2) reduces to (M1+M2)/(2*M2) instead of staying all-NaN.
+    m3_chord = m3.combine_first(m2)
+    convexity_core = (m1 + m3_chord) / conv_denom
+    convexity_core = convexity_core.where(conv_denom.notna() & (conv_denom.abs() > 1e-12))
+    convexity = convexity_core
+    if "convexity" in df.columns:
+        cx = _col(df, "convexity")
+        convexity = cx.where(cx.notna(), convexity_core)
 
     dvix = vix.diff()
     rspx = np.log(spx / spx.shift(1))

@@ -249,7 +249,10 @@ def refresh_dashboard(
 
     sig_div = _live_signal_div(sig)
 
-    last_sig_row = signals_df.iloc[-1] if not signals_df.empty else None
+    last_sig_row_raw = signals_df.iloc[-1] if not signals_df.empty else None
+    # Latest date often has incomplete VX settles; forward-fill for gauge/status so UI matches
+    # last good observation (logging still uses the raw last row below).
+    last_sig_row = signals_df.ffill().iloc[-1] if not signals_df.empty else None
     score_3d_change: float | None = None
     if not signals_df.empty and len(signals_df) >= 1:
         cs = signals_df["composite_score"]
@@ -289,9 +292,9 @@ def refresh_dashboard(
     if alert_banner is None:
         alert_banner = html.Div()
 
-    if not panel_df.empty and last_sig_row is not None:
+    if not panel_df.empty and last_sig_row_raw is not None:
         pr = panel_df.sort_values("date").iloc[-1]
-        snap = build_log_snapshot(pr, last_sig_row, score_3d_change)
+        snap = build_log_snapshot(pr, last_sig_row_raw, score_3d_change)
         try:
             ensure_initial_regime_state(snap)
             process_threshold_crossings(snap)
